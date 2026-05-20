@@ -23,13 +23,9 @@ jobs:
         load: true
         tags: campus-assistant-backend:test
     
-    - name: Create .env file
-      run: |
-        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" > .env
-    
     - name: Run container
       run: |
-        docker run -d --name test-container -p 8000:8000 campus-assistant-backend:test
+        docker run -d --name test-container -p 8000:8000 -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" campus-assistant-backend:test
         sleep 10
     
     - name: Test API
