@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        load: true
+        tags: campus-assistant-backend:test
+    
+    - name: Run container
+      run: |
+        docker run -d --name test-container -p 8000:8000 campus-assistant-backend:test
+        sleep 5
+    
+    - name: Test API
+      run: |
+        curl -f http://localhost:8000/ping || exit 1
