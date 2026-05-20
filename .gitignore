@@ -16,3 +16,4 @@ dist/
 
 # Uploads
 backend/uploads/
+temp_*
