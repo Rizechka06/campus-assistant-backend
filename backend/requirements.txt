@@ -4,4 +4,3 @@ python-multipart
 PyPDF2
 chromadb
 openai
-sentence-transformers
