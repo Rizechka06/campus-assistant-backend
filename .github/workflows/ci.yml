@@ -26,7 +26,9 @@ jobs:
     - name: Run container
       run: |
         docker run -d --name test-container -p 8000:8000 campus-assistant-backend:test
-        sleep 5
+        sleep 10
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     
     - name: Test API
       run: |
