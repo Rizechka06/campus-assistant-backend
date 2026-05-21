@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from openai import OpenAI
@@ -18,6 +20,7 @@ client = OpenAI(
     api_key=OPENROUTER_API_KEY,
 )
 
+# Бесплатный роутер OpenRouter
 MODEL_NAME = "openrouter/free"
 
 
@@ -25,6 +28,7 @@ class LectureAssistant:
     def __init__(self):
         self.chunks = []
         self.is_loaded = False
+        self.current_pdf = None
         print("🤖 Ассистент готов к работе (OpenRouter)")
 
     @staticmethod
@@ -64,6 +68,7 @@ class LectureAssistant:
 
         self.chunks = self.chunk_text(text)
         self.is_loaded = True
+        self.current_pdf = pdf_path
         print(f"✅ Лекция загружена! {len(self.chunks)} фрагментов")
         return True
 
@@ -82,46 +87,177 @@ class LectureAssistant:
         print(f"🔍 Найдено {len(top_chunks)} релевантных фрагментов")
         return top_chunks
 
-    def ask(self, question: str, language: str = "ru") -> str:
+    def generate_summary(self, language: str = "ru") -> dict:
+        """
+        Возвращает структурированный конспект лекции в виде JSON
+
+        Параметры:
+        - language: язык конспекта ("ru", "en", "ky")
+
+        Возвращает:
+        {
+            "title": "Название лекции",
+            "key_topics": ["тема1", "тема2"],
+            "key_terms": [{"term": "термин1", "definition": "определение1"}],
+            "main_conclusions": ["вывод1", "вывод2"]
+        }
+        """
         if not self.is_loaded:
-            return "❌ Сначала загрузите лекцию"
+            return {
+                "title": "Ошибка",
+                "key_topics": [],
+                "key_terms": [],
+                "main_conclusions": ["Сначала загрузите PDF через load_pdf()"]
+            }
+
+        # Собираем весь текст из чанков
+        full_text = " ".join([chunk["text"] for chunk in self.chunks])
+        full_text = full_text[:8000]
+
+        # Промпты на разных языках
+        if language == "ru":
+            prompt = f"""Ты ассистент. Проанализируй лекцию и верни ТОЛЬКО JSON без пояснений.
+
+Вот текст лекции:
+{full_text}
+
+Верни JSON в точном формате:
+{{
+    "title": "краткое название лекции",
+    "key_topics": ["тема 1", "тема 2", "тема 3"],
+    "key_terms": [
+        {{"term": "термин 1", "definition": "определение 1"}},
+        {{"term": "термин 2", "definition": "определение 2"}}
+    ],
+    "main_conclusions": ["вывод 1", "вывод 2", "вывод 3"]
+}}
+
+Только JSON, ничего другого."""
+
+        elif language == "en":
+            prompt = f"""You are an assistant. Analyze the lecture and return ONLY JSON.
+
+Lecture text:
+{full_text}
+
+Return JSON in this exact format:
+{{
+    "title": "short lecture title",
+    "key_topics": ["topic 1", "topic 2", "topic 3"],
+    "key_terms": [
+        {{"term": "term 1", "definition": "definition 1"}},
+        {{"term": "term 2", "definition": "definition 2"}}
+    ],
+    "main_conclusions": ["conclusion 1", "conclusion 2", "conclusion 3"]
+}}
+
+Only JSON, nothing else."""
+
+        elif language == "ky":
+            prompt = f"""Сен жардамчысын. Лекцияны талдап, ТЕК JSON кайтар.
+
+Лекциянын тексти:
+{full_text}
+
+Такыр ушул форматта JSON кайтар:
+{{
+    "title": "лекциянын кыскача аты",
+    "key_topics": ["тема 1", "тема 2", "тема 3"],
+    "key_terms": [
+        {{"term": "термин 1", "definition": "аныктама 1"}},
+        {{"term": "термин 2", "definition": "аныктама 2"}}
+    ],
+    "main_conclusions": ["жыйынтык 1", "жыйынтык 2", "жыйынтык 3"]
+}}
+
+Тек JSON, башка эч нерсе."""
+
+        else:
+            prompt = f"""Ты ассистент. Проанализируй лекцию и верни ТОЛЬКО JSON без пояснений.
+
+Вот текст лекции:
+{full_text}
+
+Верни JSON в точном формате:
+{{
+    "title": "краткое название лекции",
+    "key_topics": ["тема 1", "тема 2", "тема 3"],
+    "key_terms": [
+        {{"term": "термин 1", "definition": "определение 1"}},
+        {{"term": "термин 2", "definition": "определение 2"}}
+    ],
+    "main_conclusions": ["вывод 1", "вывод 2", "вывод 3"]
+}}
+
+Только JSON, ничего другого."""
+
+        try:
+            completion = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                extra_headers={
+                    "HTTP-Referer": "http://localhost",
+                    "X-Title": "Campus Lecture Assistant",
+                }
+            )
+
+            answer = completion.choices[0].message.content
+
+            # Ищем JSON в ответе
+            json_match = re.search(r'\{.*\}', answer, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+                default = {"title": "Лекция", "key_topics": [], "key_terms": [], "main_conclusions": []}
+                default.update(result)
+                return default
+            else:
+                return {
+                    "title": "Ошибка парсинга",
+                    "key_topics": [],
+                    "key_terms": [],
+                    "main_conclusions": [answer[:200]]
+                }
+
+        except Exception as e:
+            return {
+                "title": "Ошибка",
+                "key_topics": [],
+                "key_terms": [],
+                "main_conclusions": [f"Ошибка: {str(e)}"]
+            }
+
+    def ask(self, question: str, language: str = "ru") -> str:
+        """Задаёт вопрос к загруженной лекции с учётом языка"""
+        if not self.is_loaded:
+            return "❌ Сначала загрузите лекцию через load_pdf()"
 
         relevant_chunks = self._find_relevant_chunks(question)
         context = "\n\n---\n\n".join([chunk["text"] for chunk in relevant_chunks])
 
-        system_prompts = {
-            "ru": "Ты ассистент по учебным лекциям. Отвечай на вопросы, используя ТОЛЬКО текст лекции. Если ответа нет — скажи: 'В лекции это не найдено'. Отвечай кратко (1-3 предложения).",
-            "en": "You are a lecture assistant. Answer questions using ONLY the lecture text. If not found, say: 'Not found in the lecture'. Answer briefly (1-3 sentences).",
-            "ky": "Сен лекция боюнча жардамчысың. Суроолорго ТЕК лекция текстин колдонуп жооп бер. Жооп жок болсо: 'Лекциядан табылган жок' деп айт. Кыскача жооп бер (1-3 сүйлөм)."
-        }
+        # Промпты на разных языках
+        if language == "ru":
+            system_prompt = "Ты ассистент по лекциям. Отвечай кратко, только на основе текста. Если ответа нет - скажи 'Не найдено в лекции'."
+            user_prompt = f"Лекция:\n{context}\n\nВопрос: {question}\n\nОтвет:"
 
-        user_prompts = {
-            "ru": f"""Фрагменты лекции:
-{context}
+        elif language == "en":
+            system_prompt = "You are a lecture assistant. Answer briefly based only on the text. If not found - say 'Not found in the lecture'."
+            user_prompt = f"Lecture:\n{context}\n\nQuestion: {question}\n\nAnswer:"
 
-Вопрос: {question}
+        elif language == "ky":
+            system_prompt = "Сен лекция боюнча жардамчысын. Тексттин негизинде гана кыскача жооп бер. Жок болсо - 'Лекциядан табылган жок' де."
+            user_prompt = f"Лекция:\n{context}\n\nСуроо: {question}\n\nЖооп:"
 
-Ответ:""",
-            "en": f"""Lecture fragments:
-{context}
-
-Question: {question}
-
-Answer:""",
-            "ky": f"""Лекциянын фрагменттери:
-{context}
-
-Суроо: {question}
-
-Жооп:"""
-        }
+        else:
+            system_prompt = "Ты ассистент по лекциям. Отвечай кратко, только на основе текста."
+            user_prompt = f"Лекция:\n{context}\n\nВопрос: {question}\n\nОтвет:"
 
         try:
             completion = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[
-                    {"role": "system", "content": system_prompts.get(language, system_prompts["ru"])},
-                    {"role": "user", "content": user_prompts.get(language, user_prompts["ru"])}
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.3,
                 extra_headers={
@@ -133,85 +269,6 @@ Answer:""",
         except Exception as e:
             return f"❌ Ошибка: {str(e)}"
 
-    def generate_summary(self, language: str = "ru") -> dict:
-        if not self.is_loaded or not self.chunks:
-            return {"error": "Сначала загрузите PDF"}
-
-        full_text = " ".join([chunk["text"] for chunk in self.chunks[:15]])
-
-        prompts = {
-            "ru": {
-                "system": "Ты ассистент, который составляет структурированные конспекты лекций.",
-                "user": f"""На основе текста лекции составь краткий конспект в формате:
-
-## 📚 КЛЮЧЕВЫЕ ТЕМЫ
-(3-5 основных тем лекции)
-
-## 📖 ВАЖНЫЕ ТЕРМИНЫ
-(список терминов с краткими определениями)
-
-## 💡 ОСНОВНЫЕ ВЫВОДЫ
-(3-5 главных тезисов)
-
-Текст лекции:
-{full_text[:8000]}
-"""
-            },
-            "en": {
-                "system": "You are an assistant that creates structured lecture summaries.",
-                "user": f"""Based on the lecture text, create a brief summary in the format:
-
-## 📚 KEY TOPICS
-(3-5 main topics)
-
-## 📖 IMPORTANT TERMS
-(list of terms with brief definitions)
-
-## 💡 MAIN CONCLUSIONS
-(3-5 key takeaways)
-
-Lecture text:
-{full_text[:8000]}
-"""
-            },
-            "ky": {
-                "system": "Сен лекциялардын түзүмдүк конспектин түзүүчү жардамчысың.",
-                "user": f"""Лекция текстинин негизинде кыскача конспект түзүү:
-
-## 📚 НЕГИЗГИ ТЕМАЛАР
-(3-5 негизги тема)
-
-## 📖 МААНИЛҮҮ ТЕРМИНДЕР
-(терминдердин тизмеси жана кыскача түшүндүрмөсү)
-
-## 💡 НЕГИЗГИ ЖЫЙЫНТЫКТАР
-(3-5 негизги жыйынтык)
-
-Лекция тексти:
-{full_text[:8000]}
-"""
-            }
-        }
-
-        p = prompts.get(language, prompts["ru"])
-
-        try:
-            completion = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": p["system"]},
-                    {"role": "user", "content": p["user"]}
-                ],
-                temperature=0.3,
-                extra_headers={
-                    "HTTP-Referer": "http://localhost",
-                    "X-Title": "Campus Lecture Assistant",
-                }
-            )
-            return {"summary": completion.choices[0].message.content, "language": language}
-        except Exception as e:
-            return {"error": f"Ошибка генерации конспекта: {str(e)}"}
-
 
 def main():
     assistant = LectureAssistant()
@@ -219,7 +276,10 @@ def main():
         test_response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[{"role": "user", "content": "Ответь 'OK'"}],
-            extra_headers={"HTTP-Referer": "http://localhost", "X-Title": "Campus Lecture Assistant"}
+            extra_headers={
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Campus Lecture Assistant",
+            }
         )
         print(f"✅ OpenRouter работает! Ответ: {test_response.choices[0].message.content}")
     except Exception as e:
