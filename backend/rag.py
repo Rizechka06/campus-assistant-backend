@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import re
@@ -39,6 +40,8 @@ class LectureAssistant:
             for page in reader.pages:
                 page_text = page.extract_text()
                 if page_text:
+                    # Принудительно переводим в UTF-8
+                    page_text = page_text.encode('utf-8', errors='ignore').decode('utf-8')
                     text_parts.append(page_text)
             text = "".join(text_parts)
             print(f"📄 Извлечено {len(text)} символов из {pdf_path}")
@@ -73,6 +76,9 @@ class LectureAssistant:
         return True
 
     def _find_relevant_chunks(self, query: str, top_k: int = 5) -> list:
+        # Принудительно переводим запрос в UTF-8
+        query = query.encode('utf-8', errors='ignore').decode('utf-8')
+        
         query_words = set(query.lower().split())
         scored_chunks = []
         for chunk in self.chunks:
@@ -90,17 +96,6 @@ class LectureAssistant:
     def generate_summary(self, language: str = "ru") -> dict:
         """
         Возвращает структурированный конспект лекции в виде JSON
-
-        Параметры:
-        - language: язык конспекта ("ru", "en", "ky")
-
-        Возвращает:
-        {
-            "title": "Название лекции",
-            "key_topics": ["тема1", "тема2"],
-            "key_terms": [{"term": "термин1", "definition": "определение1"}],
-            "main_conclusions": ["вывод1", "вывод2"]
-        }
         """
         if not self.is_loaded:
             return {
@@ -113,8 +108,10 @@ class LectureAssistant:
         # Собираем весь текст из чанков
         full_text = " ".join([chunk["text"] for chunk in self.chunks])
         full_text = full_text[:8000]
+        # Принудительно переводим в UTF-8
+        full_text = full_text.encode('utf-8', errors='ignore').decode('utf-8')
 
-        # Промпты на разных языках
+        # Промпты на разных языках (с кодировкой)
         if language == "ru":
             prompt = f"""Ты ассистент. Проанализируй лекцию и верни ТОЛЬКО JSON без пояснений.
 
@@ -203,6 +200,7 @@ Only JSON, nothing else."""
             )
 
             answer = completion.choices[0].message.content
+            answer = answer.encode('utf-8', errors='ignore').decode('utf-8')
 
             # Ищем JSON в ответе
             json_match = re.search(r'\{.*\}', answer, re.DOTALL)
@@ -232,8 +230,12 @@ Only JSON, nothing else."""
         if not self.is_loaded:
             return "❌ Сначала загрузите лекцию через load_pdf()"
 
+        # Принудительно переводим вопрос в UTF-8
+        question = question.encode('utf-8', errors='ignore').decode('utf-8')
+        
         relevant_chunks = self._find_relevant_chunks(question)
         context = "\n\n---\n\n".join([chunk["text"] for chunk in relevant_chunks])
+        context = context.encode('utf-8', errors='ignore').decode('utf-8')
 
         # Промпты на разных языках
         if language == "ru":
@@ -265,7 +267,9 @@ Only JSON, nothing else."""
                     "X-Title": "Campus Lecture Assistant",
                 }
             )
-            return completion.choices[0].message.content
+            answer = completion.choices[0].message.content
+            answer = answer.encode('utf-8', errors='ignore').decode('utf-8')
+            return answer
         except Exception as e:
             return f"❌ Ошибка: {str(e)}"
 
