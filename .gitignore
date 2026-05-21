@@ -17,3 +17,4 @@ dist/
 # Uploads
 backend/uploads/
 temp_*
+*.db
