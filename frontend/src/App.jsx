@@ -1,91 +1,73 @@
-import React, { useState } from 'react';
+import { useState } from "react";
+import Header from "./components/Header";
+import UploadCard from "./components/UploadCard";
+import SummarySection from "./components/SummarySection";
+import ChatWindow from "./components/ChatWindow";
+import { generateSummary } from "./api/api";
 
-function App() {
-  const [file, setFile] = useState(null);
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState('');
+const App = () => {
+  const [language, setLanguage] = useState("EN");
+  const [pdfUploaded, setPdfUploaded] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState("");
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+  const handleUploadSuccess = (fileName) => {
+    setPdfUploaded(true);
+    setUploadedFileName(fileName);
+    setSummary(null);
+    setSummaryError("");
   };
 
-  const uploadPDF = async () => {
-    if (!file) {
-      alert('Выберите PDF файл');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    setUploadStatus('Загрузка...');
+  const handleGenerateSummary = async () => {
+    setSummaryLoading(true);
+    setSummaryError("");
+    setSummary(null);
     try {
-      const response = await fetch('http://localhost:8000/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
-      setUploadStatus(data.message || 'Загружено');
-    } catch (error) {
-      setUploadStatus('Ошибка: ' + error.message);
-    }
-  };
-
-  const askQuestion = async () => {
-    if (!question.trim()) {
-      alert('Введите вопрос');
-      return;
-    }
-
-    setLoading(true);
-    setAnswer('');
-
-    const formData = new FormData();
-    formData.append('question', question);
-
-    try {
-      const response = await fetch('http://localhost:8000/chat', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
-      setAnswer(data.answer || data.error || 'Нет ответа');
-    } catch (error) {
-      setAnswer('Ошибка: ' + error.message);
+      const res = await generateSummary(language);
+      setSummary(res.data.summary);
+    } catch {
+      setSummaryError("Failed to generate summary. Please try again.");
     } finally {
-      setLoading(false);
+      setSummaryLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h1>Campus Lecture Assistant</h1>
-      
-      <h3>1. Загрузить PDF</h3>
-      <input type="file" accept=".pdf" onChange={handleFileChange} />
-      <button onClick={uploadPDF}>Загрузить</button>
-      <p>{uploadStatus}</p>
-      
-      <h3>2. Задать вопрос</h3>
-      <textarea 
-        rows="3" 
-        style={{ width: '100%' }}
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        placeholder="Введите вопрос по лекции..."
-      />
-      <button onClick={askQuestion} disabled={loading}>
-        {loading ? 'Думаю...' : 'Спросить'}
-      </button>
-      
-      <h3>3. Ответ</h3>
-      <div style={{ border: '1px solid #ccc', padding: '10px', background: '#f9f9f9' }}>
-        {answer || 'Здесь появится ответ'}
-      </div>
+    <div className="app">
+      <Header language={language} onLanguageChange={setLanguage} />
+      <main className="main-container">
+        <div className="page-wrapper">
+          <div className="top-row">
+            <UploadCard
+              onUploadSuccess={handleUploadSuccess}
+              pdfUploaded={pdfUploaded}
+              uploadedFileName={uploadedFileName}
+              language={language}
+            />
+            <SummarySection
+              pdfUploaded={pdfUploaded}
+              summary={summary}
+              loading={summaryLoading}
+              error={summaryError}
+              onGenerate={handleGenerateSummary}
+              language={language}
+            />
+          </div>
+          <div className="chat-wrapper">
+            <div className="chat-label">
+              <span className="chat-label-dot" aria-hidden="true" />
+              {pdfUploaded
+                ? `AI Chat — ${uploadedFileName}`
+                : "AI Chat — upload a PDF to start"}
+            </div>
+            <ChatWindow language={language} pdfUploaded={pdfUploaded} />
+          </div>
+        </div>
+      </main>
     </div>
   );
-}
+};
 
 export default App;
