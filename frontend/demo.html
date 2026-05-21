@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lecture Assistant Demo</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        textarea { width: 100%; height: 100px; margin: 10px 0; }
+        button { padding: 10px 20px; margin: 5px; }
+        #answer { border: 1px solid #ccc; padding: 10px; margin-top: 20px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>Campus Lecture Assistant</h1>
+    
+    <h3>1. Загрузить PDF</h3>
+    <input type="file" id="pdfFile" accept=".pdf">
+    <button onclick="uploadPDF()">Загрузить</button>
+    <div id="uploadResult"></div>
+    
+    <h3>2. Задать вопрос</h3>
+    <textarea id="question" placeholder="Введите вопрос по лекции..."></textarea>
+    <button onclick="askQuestion()">Спросить</button>
+    
+    <h3>3. Ответ</h3>
+    <div id="answer"></div>
+    
+    <script>
+        async function uploadPDF() {
+            const file = document.getElementById('pdfFile').files[0];
+            if (!file) {
+                alert('Выберите файл');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch('http://localhost:8000/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            document.getElementById('uploadResult').innerHTML = 
+                data.message || data.error || 'Загружено';
+        }
+        
+        async function askQuestion() {
+            const question = document.getElementById('question').value;
+            if (!question) {
+                alert('Введите вопрос');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('question', question);
+            
+            try {
+                const response = await fetch('http://localhost:8000/chat', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                document.getElementById('answer').innerHTML = 
+                    '<strong>Ответ:</strong><br>' + (data.answer || data.error || 'Нет ответа');
+            } catch (error) {
+                document.getElementById('answer').innerHTML = 'Ошибка: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
