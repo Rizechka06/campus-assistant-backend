@@ -37,11 +37,8 @@ const App = () => {
   return (
     <div className="app">
       <Header language={language} onLanguageChange={setLanguage} />
-
       <main className="main-container">
         <div className="page-wrapper">
-
-          {/* Top row: upload + summary side by side */}
           <div className="top-row">
             <UploadCard
               onUploadSuccess={handleUploadSuccess}
@@ -58,8 +55,6 @@ const App = () => {
               language={language}
             />
           </div>
-
-          {/* Chat section */}
           <div className="chat-wrapper">
             <div className="chat-label">
               <span className="chat-label-dot" aria-hidden="true" />
@@ -69,7 +64,6 @@ const App = () => {
             </div>
             <ChatWindow language={language} pdfUploaded={pdfUploaded} />
           </div>
-
         </div>
       </main>
     </div>
