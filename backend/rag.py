@@ -40,7 +40,6 @@ class LectureAssistant:
             for page in reader.pages:
                 page_text = page.extract_text()
                 if page_text:
-                    # Принудительно переводим в UTF-8
                     page_text = page_text.encode('utf-8', errors='ignore').decode('utf-8')
                     text_parts.append(page_text)
             text = "".join(text_parts)
@@ -76,7 +75,6 @@ class LectureAssistant:
         return True
 
     def _find_relevant_chunks(self, query: str, top_k: int = 5) -> list:
-        # Принудительно переводим запрос в UTF-8
         query = query.encode('utf-8', errors='ignore').decode('utf-8')
         
         query_words = set(query.lower().split())
@@ -94,9 +92,7 @@ class LectureAssistant:
         return top_chunks
 
     def generate_summary(self, language: str = "ru") -> dict:
-        """
-        Возвращает структурированный конспект лекции в виде JSON
-        """
+        """Возвращает структурированный конспект лекции в виде JSON"""
         if not self.is_loaded:
             return {
                 "title": "Ошибка",
@@ -105,79 +101,83 @@ class LectureAssistant:
                 "main_conclusions": ["Сначала загрузите PDF через load_pdf()"]
             }
 
-        # Собираем весь текст из чанков
         full_text = " ".join([chunk["text"] for chunk in self.chunks])
         full_text = full_text[:8000]
-        # Принудительно переводим в UTF-8
         full_text = full_text.encode('utf-8', errors='ignore').decode('utf-8')
 
-        # Промпты на разных языках (с кодировкой)
+        # Промпты на разных языках с требованием перевода
         if language == "ru":
-            prompt = f"""Ты ассистент. Проанализируй лекцию и верни ТОЛЬКО JSON без пояснений.
+            prompt = f"""Ты ассистент. Проанализируй лекцию и создай конспект НА РУССКОМ ЯЗЫКЕ.
 
-Вот текст лекции:
+Текст лекции (может быть на любом языке):
 {full_text}
 
-Верни JSON в точном формате:
+Верни ТОЛЬКО JSON в точном формате:
 {{
-    "title": "краткое название лекции",
-    "key_topics": ["тема 1", "тема 2", "тема 3"],
+    "title": "название лекции на русском",
+    "key_topics": ["тема 1 на русском", "тема 2 на русском", "тема 3 на русском"],
     "key_terms": [
-        {{"term": "термин 1", "definition": "определение 1"}},
-        {{"term": "термин 2", "definition": "определение 2"}}
+        {{"term": "термин на русском", "definition": "определение на русском"}},
+        {{"term": "термин 2 на русском", "definition": "определение 2 на русском"}}
     ],
-    "main_conclusions": ["вывод 1", "вывод 2", "вывод 3"]
+    "main_conclusions": ["вывод 1 на русском", "вывод 2 на русском", "вывод 3 на русском"]
 }}
 
 Только JSON, ничего другого."""
 
         elif language == "en":
-            prompt = f"""You are an assistant. Analyze the lecture and return ONLY JSON.
+            prompt = f"""You are an assistant. Analyze the lecture and create a summary IN ENGLISH.
+
+IMPORTANT: The lecture text may be in Russian. You MUST output the summary in ENGLISH.
+Translate all terms, definitions, and conclusions into ENGLISH.
 
 Lecture text:
 {full_text}
 
-Return JSON in this exact format:
+Return ONLY JSON in this exact format:
 {{
-    "title": "short lecture title",
-    "key_topics": ["topic 1", "topic 2", "topic 3"],
+    "title": "English title of the lecture",
+    "key_topics": ["English topic 1", "English topic 2", "English topic 3"],
     "key_terms": [
-        {{"term": "term 1", "definition": "definition 1"}},
-        {{"term": "term 2", "definition": "definition 2"}}
+        {{"term": "English term 1", "definition": "English definition 1"}},
+        {{"term": "English term 2", "definition": "English definition 2"}}
     ],
-    "main_conclusions": ["conclusion 1", "conclusion 2", "conclusion 3"]
+    "main_conclusions": ["English conclusion 1", "English conclusion 2", "English conclusion 3"]
 }}
 
 Only JSON, nothing else."""
 
         elif language == "ky":
-            prompt = f"""Сен жардамчысын. Лекцияны талдап, ТЕК JSON кайтар.
+            prompt = f"""Сен жардамчысын. Лекцияны талдап, КЫРГЫЗ ТИЛИНДЕ конспект түзгүлө.
+
+МААНИЛҮҮ: Лекциянын тексти орус тилинде болушу мүмкүн. Сен ЖООПТУ КЫРГЫЗ ТИЛИНДЕ беришиң керек.
+Бардык терминдерди жана аныктамаларды КЫРГЫЗ ТИЛИНЕ которгула.
 
 Лекциянын тексти:
 {full_text}
 
-Такыр ушул форматта JSON кайтар:
+ТЕК JSON форматында кайтаргыла:
 {{
-    "title": "лекциянын кыскача аты",
-    "key_topics": ["тема 1", "тема 2", "тема 3"],
+    "title": "лекциянын кыргызча аты",
+    "key_topics": ["тема 1 кыргызча", "тема 2 кыргызча", "тема 3 кыргызча"],
     "key_terms": [
-        {{"term": "термин 1", "definition": "аныктама 1"}},
-        {{"term": "термин 2", "definition": "аныктама 2"}}
+        {{"term": "кыргызча термин 1", "definition": "кыргызча аныктама 1"}},
+        {{"term": "кыргызча термин 2", "definition": "кыргызча аныктама 2"}}
     ],
-    "main_conclusions": ["жыйынтык 1", "жыйынтык 2", "жыйынтык 3"]
+    "main_conclusions": ["кыргызча жыйынтык 1", "кыргызча жыйынтык 2", "кыргызча жыйынтык 3"]
 }}
 
 Тек JSON, башка эч нерсе."""
 
         else:
-            prompt = f"""Ты ассистент. Проанализируй лекцию и верни ТОЛЬКО JSON без пояснений.
+            prompt = f"""Ты ассистент. Проанализируй лекцию и создай конспект НА РУССКОМ ЯЗЫКЕ.
 
-Вот текст лекции:
+Текст лекции:
 {full_text}
 
-Верни JSON в точном формате:
+Верни ТОЛЬКО JSON в точном формате:
 {{
-    "title": "краткое название лекции",
+    "title": "название лекции",
     "key_topics": ["тема 1", "тема 2", "тема 3"],
     "key_terms": [
         {{"term": "термин 1", "definition": "определение 1"}},
@@ -202,7 +202,6 @@ Only JSON, nothing else."""
             answer = completion.choices[0].message.content
             answer = answer.encode('utf-8', errors='ignore').decode('utf-8')
 
-            # Ищем JSON в ответе
             json_match = re.search(r'\{.*\}', answer, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
@@ -230,14 +229,12 @@ Only JSON, nothing else."""
         if not self.is_loaded:
             return "❌ Сначала загрузите лекцию через load_pdf()"
 
-        # Принудительно переводим вопрос в UTF-8
         question = question.encode('utf-8', errors='ignore').decode('utf-8')
         
         relevant_chunks = self._find_relevant_chunks(question)
         context = "\n\n---\n\n".join([chunk["text"] for chunk in relevant_chunks])
         context = context.encode('utf-8', errors='ignore').decode('utf-8')
 
-        # Промпты на разных языках
         if language == "ru":
             system_prompt = "Ты ассистент по лекциям. Отвечай кратко, только на основе текста. Если ответа нет - скажи 'Не найдено в лекции'."
             user_prompt = f"Лекция:\n{context}\n\nВопрос: {question}\n\nОтвет:"
