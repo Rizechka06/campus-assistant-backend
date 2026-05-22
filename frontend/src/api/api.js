@@ -1,32 +1,63 @@
-import axios from "axios";
+const API_BASE = "http://localhost:8000";
 
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+const getToken = () => localStorage.getItem("token");
 
-// Upload PDF
-export const uploadPdf = (file, onProgress) => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  return api.post("/upload", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-    onUploadProgress: (e) => {
-      if (onProgress) {
-        const percent = Math.round((e.loaded * 100) / e.total);
-        onProgress(percent);
-      }
+const request = async (endpoint, options = {}) => {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
     },
   });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.json();
 };
 
-// Ask question
-export const askQuestion = (question, language) =>
-  api.post("/chat", { question, language });
+export const uploadPdf = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/upload`, {
+    method: "POST",
+    headers: {
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.status}`);
+  }
+  return response.json();
+};
 
-// Generate summary
-export const generateSummary = (language) =>
-  api.post("/summarize", { language });
+export const askQuestion = async (question, language) => {
+  const formData = new URLSearchParams();
+  formData.append("question", question);
+  formData.append("language", language.toLowerCase());
+  
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: formData.toString(),
+  });
+  const data = await response.json();
+  return { data: { answer: data.answer } };
+};
+
+export const generateSummary = async (language) => {
+  const data = await request("/summarize", {
+    method: "POST",
+    body: JSON.stringify({ language: language.toLowerCase() }),
+  });
+  return { data: { summary: data } };
+};

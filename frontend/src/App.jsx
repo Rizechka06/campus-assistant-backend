@@ -26,8 +26,10 @@ const App = () => {
     setSummary(null);
     try {
       const res = await generateSummary(language);
+      console.log("Summary received:", res.data.summary);
       setSummary(res.data.summary);
-    } catch {
+    } catch (err) {
+      console.error("Summary error:", err);
       setSummaryError("Failed to generate summary. Please try again.");
     } finally {
       setSummaryLoading(false);
