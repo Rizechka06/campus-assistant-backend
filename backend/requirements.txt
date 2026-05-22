@@ -5,3 +5,9 @@ PyPDF2
 chromadb
 openai
 python-dotenv
+
+sqlalchemy
+bcrypt
+python-jose
+passlib
+pydantic
