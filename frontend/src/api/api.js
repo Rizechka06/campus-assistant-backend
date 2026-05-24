@@ -1,4 +1,4 @@
-const API_BASE = "https://campus-assistant-backend-production.up.railway.app";
+const API_BASE = "http://localhost:8000";
 
 const getToken = () => localStorage.getItem("token");
 
