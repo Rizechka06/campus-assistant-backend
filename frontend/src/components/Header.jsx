@@ -1,12 +1,11 @@
-const LANGUAGES = ["EN", "RU", "KG"];
-
 const SUBTITLES = {
-  EN: "Study smarter with AI",
-  RU: "Учись умнее с ИИ",
-  KG: "ИИ менен акылдуу оку",
+  EN: "AI-powered lecture summarizer",
+  RU: "ИИ-конспект лекций",
 };
 
-const Header = ({ language, onLanguageChange }) => (
+const LANGUAGES = ["EN", "RU"];
+
+const Header = ({ language, onLanguageChange, onLogout }) => (
   <header className="site-header">
     <div className="site-header__inner">
       <div className="site-header__brand">
@@ -21,7 +20,7 @@ const Header = ({ language, onLanguageChange }) => (
         {LANGUAGES.map((lang) => (
           <button
             key={lang}
-            className={`lang-pill ${language === lang ? "lang-pill--active" : ""}`}
+            className={`lang-pill${language === lang ? " lang-pill--active" : ""}`}
             onClick={() => onLanguageChange(lang)}
             aria-pressed={language === lang}
           >
@@ -29,6 +28,17 @@ const Header = ({ language, onLanguageChange }) => (
           </button>
         ))}
       </nav>
+
+      {/* Logout button */}
+      {onLogout && (
+        <button
+          onClick={onLogout}
+          className="btn btn--ghost btn--sm"
+          style={{ marginLeft: 8 }}
+        >
+          🚪 {language === "RU" ? "Выйти" : "Log out"}
+        </button>
+      )}
     </div>
   </header>
 );

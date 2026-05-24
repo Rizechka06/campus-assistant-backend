@@ -3,12 +3,23 @@ import Header from "./components/Header";
 import UploadCard from "./components/UploadCard";
 import SummarySection from "./components/SummarySection";
 import ChatWindow from "./components/ChatWindow";
+import AuthPage from "./components/AuthPage";
 import { generateSummary } from "./api/api";
 
 const ELEVENLABS_API_KEY = "YOUR_API_KEY_HERE"; // 🔑 Замени на свой ключ
 const VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Rachel — поддерживает русский через eleven_multilingual_v2
 
 const App = () => {
+  // Auth — stays logged in on refresh if token exists
+  const [user, setUser] = useState(() =>
+    localStorage.getItem("token") ? { token: localStorage.getItem("token") } : null
+  );
+
+  const handleLogin = (userData) => setUser(userData);
+  const handleLogout = () => { localStorage.removeItem("token"); setUser(null); };
+
+  if (!user) return <AuthPage onLogin={handleLogin} />;
+
   const [language, setLanguage] = useState("EN");
   const [pdfUploaded, setPdfUploaded] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
@@ -37,10 +48,8 @@ const App = () => {
     stopAudio();
     try {
       const res = await generateSummary(language);
-      console.log("Summary received:", res.data.summary);
       setSummary(res.data.summary);
-    } catch (err) {
-      console.error("Summary error:", err);
+    } catch {
       setSummaryError("Failed to generate summary. Please try again.");
     } finally {
       setSummaryLoading(false);
@@ -150,7 +159,7 @@ const App = () => {
 
   return (
     <div className="app">
-      <Header language={language} onLanguageChange={setLanguage} />
+      <Header language={language} onLanguageChange={setLanguage} onLogout={handleLogout} />
       <main className="main-container">
         <div className="page-wrapper">
           <div className="top-row">
