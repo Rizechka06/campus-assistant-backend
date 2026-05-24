@@ -3,7 +3,7 @@ import { useState } from "react";
 
 const AuthPage = ({ onLogin }) => {
   const [mode, setMode] = useState("login"); // "login" | "register"
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -18,10 +18,7 @@ const AuthPage = ({ onLogin }) => {
       setError("Please fill in all fields.");
       return;
     }
-    if (mode === "register" && !form.name) {
-      setError("Please enter your name.");
-      return;
-    }
+
 
     setLoading(true);
     try {
@@ -31,7 +28,7 @@ const AuthPage = ({ onLogin }) => {
       const body =
         mode === "login"
           ? { email: form.email, password: form.password }
-          : { name: form.name, email: form.email, password: form.password };
+          : { email: form.email, password: form.password };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -82,21 +79,6 @@ const AuthPage = ({ onLogin }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form}>
-          {mode === "register" && (
-            <div style={styles.field}>
-              <label style={styles.label}>Name</label>
-              <input
-                style={styles.input}
-                type="text"
-                name="name"
-                placeholder="Your name"
-                value={form.name}
-                onChange={handleChange}
-                autoComplete="name"
-              />
-            </div>
-          )}
-
           <div style={styles.field}>
             <label style={styles.label}>Email</label>
             <input

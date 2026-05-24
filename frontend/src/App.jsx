@@ -14,8 +14,13 @@ const App = () => {
   const [user, setUser] = useState(() =>
     localStorage.getItem("token") ? { token: localStorage.getItem("token") } : null
   );
+  const [showWelcome, setShowWelcome] = useState(false);
 
-  const handleLogin = (userData) => setUser(userData);
+  const handleLogin = (userData) => {
+    setUser(userData);
+    setShowWelcome(true);
+    setTimeout(() => setShowWelcome(false), 3000);
+  };
   const handleLogout = () => { localStorage.removeItem("token"); setUser(null); };
 
   if (!user) return <AuthPage onLogin={handleLogin} />;
@@ -159,6 +164,17 @@ const App = () => {
 
   return (
     <div className="app">
+      {showWelcome && (
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+          background: "#4F8EF7", color: "#fff", padding: "12px 24px",
+          borderRadius: 12, fontWeight: 600, fontSize: 15,
+          boxShadow: "0 4px 20px rgba(79,142,247,0.4)",
+          zIndex: 9999, animation: "fadeIn 0.3s ease"
+        }}>
+          👋 Здравствуйте! Добро пожаловать!
+        </div>
+      )}
       <Header language={language} onLanguageChange={setLanguage} onLogout={handleLogout} />
       <main className="main-container">
         <div className="page-wrapper">
