@@ -1,13 +1,17 @@
-version: '3.8'
-
 services:
   backend:
     build: .
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data  # Сохраняем БД на хост-машине
-    environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - SECRET_KEY=${SECRET_KEY}
+      - ./backend:/app
+    env_file:
+      - .env
     command: uvicorn app:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend

@@ -19,21 +19,17 @@ const AuthPage = ({ onLogin }) => {
       return;
     }
 
-
     setLoading(true);
     try {
       const endpoint =
-        mode === "login" ? "/api/auth/login" : "/api/auth/register";
-
-      const body =
         mode === "login"
-          ? { email: form.email, password: form.password }
-          : { email: form.email, password: form.password };
+          ? "http://localhost:8000/auth/login"
+          : "http://localhost:8000/auth/register";
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ email: form.email, password: form.password }),
       });
 
       const data = await res.json();
@@ -44,7 +40,7 @@ const AuthPage = ({ onLogin }) => {
       }
 
       // Save token and call onLogin
-      if (data.token) localStorage.setItem("token", data.token);
+      if (data.access_token) localStorage.setItem("token", data.access_token);
       onLogin(data.user || { email: form.email });
     } catch {
       setError("Network error. Please try again.");

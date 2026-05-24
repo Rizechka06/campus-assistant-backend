@@ -1,30 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import AuthPage from "./components/AuthPage";
 import Header from "./components/Header";
 import UploadCard from "./components/UploadCard";
 import SummarySection from "./components/SummarySection";
 import ChatWindow from "./components/ChatWindow";
-import AuthPage from "./components/AuthPage";
 import { generateSummary } from "./api/api";
 
-const ELEVENLABS_API_KEY = "YOUR_API_KEY_HERE"; // 🔑 Замени на свой ключ
-const VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // Rachel — поддерживает русский через eleven_multilingual_v2
-
 const App = () => {
-  // Auth — stays logged in on refresh if token exists
-  const [user, setUser] = useState(() =>
-    localStorage.getItem("token") ? { token: localStorage.getItem("token") } : null
-  );
-  const [showWelcome, setShowWelcome] = useState(false);
-
-  const handleLogin = (userData) => {
-    setUser(userData);
-    setShowWelcome(true);
-    setTimeout(() => setShowWelcome(false), 3000);
-  };
-  const handleLogout = () => { localStorage.removeItem("token"); setUser(null); };
-
-  if (!user) return <AuthPage onLogin={handleLogin} />;
-
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
   const [language, setLanguage] = useState("EN");
   const [pdfUploaded, setPdfUploaded] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
@@ -32,150 +16,68 @@ const App = () => {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
 
-  // TTS state
-  const [ttsLoading, setTtsLoading] = useState(false);
-  const [ttsError, setTtsError] = useState("");
-  const [ttsAudio, setTtsAudio] = useState(null); // Audio instance
-  const [ttsPlaying, setTtsPlaying] = useState(false);
+  // Проверяем, есть ли токен при загрузке
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      setIsLoggedIn(true);
+      setUser({ email: localStorage.getItem("userEmail") || "User" });
+    }
+  }, []);
+
+  const handleLogin = (userData) => {
+    setIsLoggedIn(true);
+    setUser(userData);
+    if (userData.email) {
+      localStorage.setItem("userEmail", userData.email);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
+    setIsLoggedIn(false);
+    setUser(null);
+    setPdfUploaded(false);
+    setUploadedFileName("");
+    setSummary(null);
+  };
 
   const handleUploadSuccess = (fileName) => {
     setPdfUploaded(true);
     setUploadedFileName(fileName);
     setSummary(null);
     setSummaryError("");
-    stopAudio();
   };
 
   const handleGenerateSummary = async () => {
     setSummaryLoading(true);
     setSummaryError("");
     setSummary(null);
-    stopAudio();
     try {
       const res = await generateSummary(language);
+      console.log("Summary received:", res.data.summary);
       setSummary(res.data.summary);
-    } catch {
+    } catch (err) {
+      console.error("Summary error:", err);
       setSummaryError("Failed to generate summary. Please try again.");
     } finally {
       setSummaryLoading(false);
     }
   };
 
-  const stopAudio = () => {
-    if (ttsAudio) {
-      ttsAudio.pause();
-      ttsAudio.currentTime = 0;
-    }
-    setTtsAudio(null);
-    setTtsPlaying(false);
-    setTtsError("");
-  };
-
-  // Build a plain text string from the summary object for TTS
-  const buildSummaryText = (summary) => {
-    if (!summary) return "";
-    const parts = [];
-
-    if (summary.title) parts.push(summary.title);
-    if (summary.overview) parts.push(summary.overview);
-
-    if (summary.topics?.length) {
-      parts.push("Main topics: " + summary.topics.join(", "));
-    }
-    if (summary.terms?.length) {
-      parts.push(
-        "Key terms: " +
-          summary.terms.map((t) => (typeof t === "string" ? t : t.term || t.label || "")).join(", ")
-      );
-    }
-    if (summary.conclusions?.length) {
-      parts.push("Conclusions:");
-      summary.conclusions.forEach((c) => {
-        parts.push(typeof c === "string" ? c : c.text || c.label || "");
-      });
-    }
-
-    return parts.join(". ");
-  };
-
-  const handleSpeak = async () => {
-    // If already playing — stop
-    if (ttsPlaying) {
-      stopAudio();
-      return;
-    }
-
-    const text = buildSummaryText(summary);
-    if (!text) return;
-
-    setTtsLoading(true);
-    setTtsError("");
-
-    try {
-      const response = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "xi-api-key": ELEVENLABS_API_KEY,
-          },
-          body: JSON.stringify({
-            text,
-            model_id: "eleven_multilingual_v2",
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.75,
-            },
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.detail?.message || "ElevenLabs API error");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-
-      audio.onended = () => {
-        setTtsPlaying(false);
-        setTtsAudio(null);
-        URL.revokeObjectURL(url);
-      };
-
-      audio.onerror = () => {
-        setTtsError("Playback error.");
-        setTtsPlaying(false);
-        setTtsAudio(null);
-      };
-
-      setTtsAudio(audio);
-      setTtsPlaying(true);
-      audio.play();
-    } catch (e) {
-      setTtsError(e.message || "Failed to generate audio.");
-    } finally {
-      setTtsLoading(false);
-    }
-  };
+  if (!isLoggedIn) {
+    return <AuthPage onLogin={handleLogin} />;
+  }
 
   return (
     <div className="app">
-      {showWelcome && (
-        <div style={{
-          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
-          background: "#4F8EF7", color: "#fff", padding: "12px 24px",
-          borderRadius: 12, fontWeight: 600, fontSize: 15,
-          boxShadow: "0 4px 20px rgba(79,142,247,0.4)",
-          zIndex: 9999, animation: "fadeIn 0.3s ease"
-        }}>
-          👋 Здравствуйте! Добро пожаловать!
-        </div>
-      )}
-      <Header language={language} onLanguageChange={setLanguage} onLogout={handleLogout} />
+      <Header 
+        language={language} 
+        onLanguageChange={setLanguage} 
+        onLogout={handleLogout}
+        userEmail={user?.email}
+      />
       <main className="main-container">
         <div className="page-wrapper">
           <div className="top-row">
@@ -192,11 +94,6 @@ const App = () => {
               error={summaryError}
               onGenerate={handleGenerateSummary}
               language={language}
-              // TTS props
-              onSpeak={handleSpeak}
-              ttsLoading={ttsLoading}
-              ttsPlaying={ttsPlaying}
-              ttsError={ttsError}
             />
           </div>
           <div className="chat-wrapper">

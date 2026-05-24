@@ -1,186 +1,147 @@
-// components/SummarySection.jsx
-// Добавлена кнопка 🔊 Озвучить через ElevenLabs
+import { useState } from "react";
 
-const SummarySection = ({
-  pdfUploaded,
-  summary,
-  loading,
-  error,
-  onGenerate,
-  language,
-  // TTS
-  onSpeak,
-  ttsLoading,
-  ttsPlaying,
-  ttsError,
-}) => {
-  const t = {
-    EN: {
-      title: "Summary",
-      generate: "Generate Summary",
-      generating: "Generating…",
-      locked: "Upload a PDF to generate a summary",
-      idle: "Click 'Generate Summary' to analyse the document.",
-      speak: "Read aloud",
-      stop: "Stop",
-      speaking: "Loading audio…",
-    },
-    RU: {
-      title: "Конспект",
-      generate: "Создать конспект",
-      generating: "Создаём…",
-      locked: "Загрузите PDF, чтобы создать конспект",
-      idle: "Нажмите «Создать конспект» для анализа документа.",
-      speak: "Озвучить",
-      stop: "Стоп",
-      speaking: "Загрузка аудио…",
-    },
-  }[language] || {};
+const SummarySection = ({ pdfUploaded, summary, loading, error, onGenerate }) => {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const formatSummaryToText = (summaryData) => {
+    if (!summaryData) return "";
+    let text = "";
+    if (summaryData.title) text += `Название лекции: ${summaryData.title}. `;
+    if (summaryData.key_topics?.length) {
+      text += `Ключевые темы: ${summaryData.key_topics.join(", ")}. `;
+    }
+    if (summaryData.key_terms?.length) {
+      text += `Термины: `;
+      summaryData.key_terms.forEach((term) => {
+        text += `${term.term} — ${term.definition}. `;
+      });
+    }
+    if (summaryData.main_conclusions?.length) {
+      text += `Выводы: ${summaryData.main_conclusions.join(", ")}. `;
+    }
+    return text;
+  };
+
+  const speakSummary = () => {
+    if (!summary) {
+      alert("Сначала сгенерируйте конспект");
+      return;
+    }
+
+    const textToSpeak = formatSummaryToText(summary);
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = "ru-RU";
+    utterance.rate = 0.9;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
+
+  if (!pdfUploaded) {
+    return (
+      <div style={{ padding: 16, background: "#f0f0f0", borderRadius: 12 }}>
+        📄 Upload a PDF to generate summary
+      </div>
+    );
+  }
 
   return (
-    <div className={`card summary-card${!pdfUploaded ? " card--locked" : ""}`}>
-      {/* Header */}
-      <div className="card__header">
-        <span className="card__icon">📋</span>
-        <span className="card__title">{t.title}</span>
+    <div style={{ padding: 16, background: "#f9f9f9", borderRadius: 12 }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        <button
+          onClick={onGenerate}
+          disabled={loading}
+          style={{
+            padding: "10px 20px",
+            background: "#4F8EF7",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+          }}
+        >
+          {loading ? "⏳ Generating..." : "📝 Generate Summary"}
+        </button>
 
-        {/* Action buttons row */}
-        <div style={{ marginLeft: "auto", display: "flex", gap: "8px", alignItems: "center" }}>
-          {/* Speak button — always visible, disabled until summary is ready */}
-          <button
-            className="btn btn--sm btn--ghost"
-            onClick={onSpeak}
-            disabled={!summary || !pdfUploaded || ttsLoading}
-            title={ttsPlaying ? t.stop : t.speak}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              borderColor: ttsPlaying ? "var(--blue)" : undefined,
-              color: ttsPlaying ? "var(--blue)" : undefined,
-            }}
-          >
-            {ttsLoading ? (
-              <>
-                <span
-                  style={{
-                    width: 12,
-                    height: 12,
-                    border: "2px solid var(--border-strong)",
-                    borderTopColor: "var(--blue)",
-                    borderRadius: "50%",
-                    display: "inline-block",
-                    animation: "spin 0.7s linear infinite",
-                  }}
-                />
-                {t.speaking}
-              </>
-            ) : ttsPlaying ? (
-              <>⏹ {t.stop}</>
-            ) : (
-              <>🔊 {t.speak}</>
-            )}
-          </button>
-
-          {/* Generate button */}
-          <button
-            className="btn btn--primary btn--sm"
-            onClick={onGenerate}
-            disabled={!pdfUploaded || loading}
-          >
-            {loading ? t.generating : t.generate}
-          </button>
-        </div>
+        {summary && (
+          <>
+            <button
+              onClick={speakSummary}
+              disabled={isSpeaking}
+              style={{
+                padding: "10px 20px",
+                background: "#28a745",
+                color: "white",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+              }}
+            >
+              {isSpeaking ? "🔊 Speaking..." : "🔊 Listen"}
+            </button>
+            <button
+              onClick={stopSpeaking}
+              style={{
+                padding: "10px 20px",
+                background: "#dc3545",
+                color: "white",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+              }}
+            >
+              ⏹ Stop
+            </button>
+          </>
+        )}
       </div>
 
-      {/* TTS error */}
-      {ttsError && (
-        <div className="msg msg--error" style={{ marginBottom: 12 }}>
-          ⚠️ {ttsError}
+      {error && <div style={{ color: "red", marginTop: 8 }}>❌ {error}</div>}
+
+      {summary && (
+        <div
+          style={{
+            marginTop: 16,
+            background: "white",
+            padding: 12,
+            borderRadius: 8,
+            border: "1px solid #ddd",
+          }}
+        >
+          <h4 style={{ margin: "0 0 8px 0" }}>📋 Lecture Summary</h4>
+          <div>
+            <strong>Title:</strong> {summary.title}
+          </div>
+          <div>
+            <strong>Key Topics:</strong> {summary.key_topics?.join(", ")}
+          </div>
+          <div>
+            <strong>Key Terms:</strong>
+          </div>
+          <ul>
+            {summary.key_terms?.map((term, i) => (
+              <li key={i}>
+                <strong>{term.term}</strong> — {term.definition}
+              </li>
+            ))}
+          </ul>
+          <div>
+            <strong>Main Conclusions:</strong>
+          </div>
+          <ul>
+            {summary.main_conclusions?.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
         </div>
       )}
-
-      {/* Body */}
-      {!pdfUploaded ? (
-        <div className="summary-locked">
-          <span className="summary-locked__icon">🔒</span>
-          <span>{t.locked}</span>
-        </div>
-      ) : loading ? (
-        <div className="summary-loading">
-          <span className="skeleton" />
-          <span className="skeleton skeleton--medium" />
-          <span className="skeleton skeleton--short" />
-          <span className="skeleton" />
-          <span className="skeleton skeleton--medium" />
-        </div>
-      ) : error ? (
-        <div className="msg msg--error">{error}</div>
-      ) : !summary ? (
-        <p className="summary-idle">{t.idle}</p>
-      ) : (
-        <div className="summary-body">
-          {/* Overview */}
-          {summary.overview && (
-            <div className="sum-block">
-              <div className="sum-block__label">Overview</div>
-              <p style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
-                {summary.overview}
-              </p>
-            </div>
-          )}
-
-          {/* Topics */}
-          {summary.topics?.length > 0 && (
-            <div className="sum-block">
-              <div className="sum-block__label">Topics</div>
-              <div className="sum-block__items--pills">
-                {summary.topics.map((topic, i) => (
-                  <span key={i} className="sum-pill sum-pill--accent">
-                    {topic}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Key Terms */}
-          {summary.terms?.length > 0 && (
-            <div className="sum-block">
-              <div className="sum-block__label">Key Terms</div>
-              <div className="sum-block__items--pills">
-                {summary.terms.map((term, i) => (
-                  <span key={i} className="sum-pill">
-                    {typeof term === "string" ? term : term.term || term.label || term}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Conclusions */}
-          {summary.conclusions?.length > 0 && (
-            <div className="sum-block">
-              <div className="sum-block__label">Conclusions</div>
-              <div className="sum-block__items--list">
-                {summary.conclusions.map((item, i) => (
-                  <div key={i} className="sum-list-item">
-                    <span className="sum-list-item__dot" />
-                    <span>{typeof item === "string" ? item : item.text || item.label || item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Spinner keyframe — injected inline so no extra CSS file needed */}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };
